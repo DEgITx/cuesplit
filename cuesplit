@@ -1,0 +1,40 @@
+#!/bin/bash
+
+CUE_FILE=`find -type f -name '*.cue'`
+if [ -z "$CUE_FILE" ]; then
+    echo "Cue file not founded"
+    exit
+fi
+
+FLAC_FILE=`find -type f -name '*.flac'`
+if [ -z "$FLAC_FILE" ]; then
+    echo "Flac file not founded"
+    exit
+fi
+
+echo "Using flac file: $FLAC_FILE"
+echo "Using cue file: $CUE_FILE"
+
+echo "Spliting files"
+cuebreakpoints "$CUE_FILE" | shnsplit -o flac -a splited "$FLAC_FILE"
+echo "Append tags"
+cuetag.sh "$CUE_FILE" splited*.flac
+
+YEAR=`cat "$CUE_FILE" | grep "REM DATE" | sed -e 's/REM DATE //g'`
+
+echo "Renaming files"
+for FILE in `find -type f -name 'splited*.flac'`
+do
+	TITLE=`metaflac --show-tag=TITLE "$FILE" | sed -e s/TITLE=//g`
+	TRACKNUMBER=`metaflac --show-tag=TRACKNUMBER "$FILE" | sed s/TRACKNUMBER=//g`
+	# Fix number
+	TRACKNUMBER=`printf %.2u $TRACKNUMBER`
+	
+	# Fix year in tags
+	if [ -n "$YEAR" ]; then
+		metaflac --set-tag="DATE=$YEAR" $FILE
+	fi
+	
+	mv "$FILE" "$TRACKNUMBER. $TITLE.flac"
+	echo "Finished work for track: $TRACKNUMBER. $TITLE.flac"
+done
